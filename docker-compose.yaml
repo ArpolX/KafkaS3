@@ -13,10 +13,11 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_started
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     ports:
@@ -26,14 +27,17 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
     depends_on:
-      - kafka
-  producer:
+      kafka:
+        condition: service_started
+  app:
     build: .
-    command: go run ./cmd/kafka/producer/main.go
+    command: go run ./cmd/app/main.go
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
   consumer:
     build: .
     command: go run ./cmd/kafka/consumer/main.go
     depends_on:
-      - producer
+      app:
+        condition: service_started

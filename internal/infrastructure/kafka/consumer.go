@@ -32,5 +32,6 @@ func StartConsumer(ctx context.Context, logger logger.Logger) {
 		if message.Value == nil {
 			logger.Error("Пустое сообщение в consumer")
 		}
+		logger.Info("Сообщение получено consumer")
 	}
 }

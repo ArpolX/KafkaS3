@@ -6,5 +6,5 @@ RUN go mod download
 
 COPY . .
 
-CMD [ "go", "run", "cmd/producer/main.go" ]
+CMD [ "go", "run", "cmd/app/main.go" ]
 
