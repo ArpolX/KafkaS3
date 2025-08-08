@@ -1,10 +1,11 @@
 package app
 
 import (
-	"KafkaS3/internal/controller"
+	"KafkaS3/internal/config"
+	ctrl "KafkaS3/internal/controller"
 	"KafkaS3/internal/infrastructure/kafka"
-	"KafkaS3/internal/infrastructure/logger"
-	"KafkaS3/internal/service"
+	"KafkaS3/internal/infrastructure/s3"
+	srv "KafkaS3/internal/service"
 	"context"
 	"fmt"
 	"net"
@@ -16,20 +17,32 @@ import (
 	"go.uber.org/zap"
 )
 
-func Run(l logger.Logger) error {
-	ctx := context.Background()
+func Run(ctx context.Context, cfg *config.Config, l *zap.SugaredLogger) error {
+	s3, err := s3.NewS3Client(ctx, l, cfg)
+	if err != nil {
+		l.Errorf("error start s3", zap.Error(err))
+		return fmt.Errorf("error start s3: %w", err)
+	}
 
 	writer := kafka.StartProducer(ctx, l)
 
-	Service := service.NewServiceImpl(l)
+	service := srv.NewServiceImpl(l)
 
-	Controller := controller.NewController(writer, l, Service)
+	controller := ctrl.NewController(writer, s3, l, service)
 
 	go func() {
-		err := Controller.DispatchKafka(ctx)
+		err := controller.DispatchKafka(ctx)
 		if err != nil {
 			return
 		}
+	}()
+
+	go func() {
+		info, err := controller.UploadImage(ctx, "/../../image/", "dto.png")
+		if err != nil {
+			return
+		}
+		l.Info("s3", info)
 	}()
 
 	server := http.Server{}

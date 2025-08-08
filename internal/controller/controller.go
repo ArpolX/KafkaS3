@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"KafkaS3/internal/infrastructure/logger"
+	"KafkaS3/internal/infrastructure/s3"
 	"KafkaS3/internal/service"
 	"context"
 	"encoding/json"
@@ -9,23 +9,24 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/minio/minio-go"
+	"github.com/minio/minio-go/v7"
 	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 )
 
 type Controller struct {
 	KafkaWriter *kafka.Writer
-	MinioClient *minio.Client
-	Logger      logger.Logger
+	S3          *s3.S3
+	Logger      *zap.SugaredLogger
 	Service     service.Service
 }
 
-func NewController(writer *kafka.Writer, logger logger.Logger, service service.Service) *Controller {
+func NewController(writer *kafka.Writer, s3 *s3.S3, logger *zap.SugaredLogger, service service.Service) *Controller {
 	return &Controller{
 		KafkaWriter: writer,
 		Logger:      logger,
 		Service:     service,
+		S3:          s3,
 	}
 }
 
@@ -55,6 +56,15 @@ func (c *Controller) DispatchKafka(ctx context.Context) error {
 	}
 }
 
-func (c *Controller) UploadImage(ctx context.Context) error {
+func (c *Controller) UploadImage(ctx context.Context, filePath, objectName string) (minio.UploadInfo, error) {
+	info, err := c.S3.Minio.FPutObject(ctx, c.S3.Bucket, objectName, filePath, minio.PutObjectOptions{
+		ContentType: "image/png",
+	})
+	if err != nil {
+		c.Logger.Error("Ошибка отправки изображения в s3, метод UploadImage", zap.Error(err))
+		return minio.UploadInfo{}, fmt.Errorf("Ошибка отправки изображения в s3, метод UploadImage: %w", err)
+	}
+	c.Logger.Info("Изображение отправлено")
 
+	return info, nil
 }

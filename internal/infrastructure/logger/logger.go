@@ -1,48 +1,27 @@
 package logger
 
 import (
-	"log"
+	"os"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-type Log struct {
-	Logger *zap.Logger
-}
-
-type Logger interface {
-	Info(msg string, fields ...zap.Field)
-	Warn(msg string, fields ...zap.Field)
-	Error(msg string, fields ...zap.Field)
-	Fatal(msg string, fields ...zap.Field)
-}
-
-func NewLogger() Logger {
-	cfg := zap.NewDevelopmentConfig()
-	cfg.DisableStacktrace = true
-
-	logger, err := cfg.Build()
-	if err != nil {
-		log.Fatalf("Ошибка при билде zap logger: %v", err)
+func NewLogger() *zap.SugaredLogger {
+	cfg := zapcore.EncoderConfig{
+		TimeKey:        "time",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "called",
+		MessageKey:     "message",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 
-	return &Log{
-		Logger: logger.WithOptions(zap.AddCallerSkip(1)),
-	}
-}
-
-func (l *Log) Info(msg string, fields ...zap.Field) {
-	l.Logger.Info(msg, fields...)
-}
-
-func (l *Log) Warn(msg string, fields ...zap.Field) {
-	l.Logger.Warn(msg, fields...)
-}
-
-func (l *Log) Error(msg string, fields ...zap.Field) {
-	l.Logger.Error(msg, fields...)
-}
-
-func (l *Log) Fatal(msg string, fields ...zap.Field) {
-	l.Logger.Fatal(msg, fields...)
+	enc := zapcore.NewConsoleEncoder(cfg)
+	return zap.New(zapcore.NewCore(enc, zapcore.AddSync(os.Stdout), zap.NewAtomicLevel())).Sugar()
 }

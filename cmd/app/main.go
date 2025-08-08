@@ -2,14 +2,25 @@ package main
 
 import (
 	"KafkaS3/internal/app"
+	"KafkaS3/internal/config"
 	"KafkaS3/internal/infrastructure/logger"
+	"context"
+
+	"go.uber.org/zap"
 )
 
 func main() {
-	logger := logger.NewLogger()
+	l := logger.NewLogger()
 
-	err := app.Run(logger)
+	ctx := context.Background()
+
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		logger.Fatal("Ошибка запуска сервера")
+		l.Fatal("Ошибка чтения конфигурации .env файла", zap.Error(err))
+	}
+
+	err = app.Run(ctx, cfg, l)
+	if err != nil {
+		l.Fatal("Ошибка запуска сервера")
 	}
 }

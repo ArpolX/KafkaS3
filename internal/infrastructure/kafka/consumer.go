@@ -1,7 +1,6 @@
 package kafka
 
 import (
-	"KafkaS3/internal/infrastructure/logger"
 	"context"
 
 	"github.com/segmentio/kafka-go"
@@ -12,7 +11,7 @@ const (
 	groupID = "my-consumer-group"
 )
 
-func StartConsumer(ctx context.Context, logger logger.Logger) {
+func StartConsumer(ctx context.Context, logger *zap.SugaredLogger) {
 	topic := "my-topic"
 
 	cfg := kafka.ReaderConfig{

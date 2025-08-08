@@ -1,13 +1,13 @@
 package kafka
 
 import (
-	"KafkaS3/internal/infrastructure/logger"
 	"context"
 
 	"github.com/segmentio/kafka-go"
+	"go.uber.org/zap"
 )
 
-func StartProducer(ctx context.Context, logger logger.Logger) *kafka.Writer {
+func StartProducer(ctx context.Context, logger *zap.SugaredLogger) *kafka.Writer {
 	topic := "my-topic"
 
 	cfg := kafka.WriterConfig{

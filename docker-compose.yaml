@@ -29,11 +29,26 @@ services:
     depends_on:
       kafka:
         condition: service_started
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9091"
+    ports:
+      - "${MINIO_PORT}:${MINIO_PORT}"
+      - "9091:9091" # UI
+    environment:
+      MINIO_ROOT_USER: "admin"
+      MINIO_ROOT_PASSWORD: "password"
+    env_file:
+      - .env
+    # volumes:
+    #   - minio_data:/data
   app:
     build: .
     command: go run ./cmd/app/main.go
     depends_on:
       kafka:
+        condition: service_started
+      minio:
         condition: service_started
   consumer:
     build: .
