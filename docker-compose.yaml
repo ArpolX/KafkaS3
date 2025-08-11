@@ -7,7 +7,8 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.3.2
     ports:
-      - "9092:9092"
+      - "${KAFKA_PORT}:${KAFKA_PORT}"
+    restart: always
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -15,13 +16,14 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG4J_LOGGERS: org.apache.kafka=ERROR,kafka=ERROR,kafka.controller=ERROR,kafka.log.LogCleaner=ERROR,state.change.logger=ERROR
     depends_on:
       zookeeper:
         condition: service_started
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     ports:
-      - "8080:8080"
+      - "${KAFKA_PORT_UI}:${KAFKA_PORT_UI}"
     environment:
       KAFKA_CLUSTERS_0_NAME: KafkaS3
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
@@ -34,17 +36,17 @@ services:
     command: server /data --console-address ":9091"
     ports:
       - "${MINIO_PORT}:${MINIO_PORT}"
-      - "9091:9091" # UI
+      - "${MINIO_PORT_UI}:${MINIO_PORT_UI}" # UI
     environment:
-      MINIO_ROOT_USER: "admin"
-      MINIO_ROOT_PASSWORD: "password"
+      MINIO_ROOT_USER: ${ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${SECRET_ACCESS_KEY}
     env_file:
       - .env
-    # volumes:
-    #   - minio_data:/data
   app:
     build: .
     command: go run ./cmd/app/main.go
+    volumes:
+      - ./download_s3_image:/app/download_s3_image
     depends_on:
       kafka:
         condition: service_started

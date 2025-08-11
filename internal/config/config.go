@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -36,7 +35,6 @@ func LoadConfig() (*Config, error) {
 	if err := cleanenv.ReadEnv(&cfg); err != nil {
 		return nil, fmt.Errorf("Ошибка чтения .env файла, метод LoadConfig: %w", err)
 	}
-	log.Println(cfg)
 
 	return &cfg, nil
 }

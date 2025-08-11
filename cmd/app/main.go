@@ -19,8 +19,5 @@ func main() {
 		l.Fatal("Ошибка чтения конфигурации .env файла", zap.Error(err))
 	}
 
-	err = app.Run(ctx, cfg, l)
-	if err != nil {
-		l.Fatal("Ошибка запуска сервера")
-	}
+	app.Run(ctx, cfg, l)
 }

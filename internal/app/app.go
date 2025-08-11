@@ -3,11 +3,10 @@ package app
 import (
 	"KafkaS3/internal/config"
 	ctrl "KafkaS3/internal/controller"
-	"KafkaS3/internal/infrastructure/kafka"
+	kafka1 "KafkaS3/internal/infrastructure/kafka/producer"
 	"KafkaS3/internal/infrastructure/s3"
 	srv "KafkaS3/internal/service"
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -17,19 +16,19 @@ import (
 	"go.uber.org/zap"
 )
 
-func Run(ctx context.Context, cfg *config.Config, l *zap.SugaredLogger) error {
+func Run(ctx context.Context, cfg *config.Config, l *zap.SugaredLogger) {
 	s3, err := s3.NewS3Client(ctx, l, cfg)
 	if err != nil {
 		l.Errorf("error start s3", zap.Error(err))
-		return fmt.Errorf("error start s3: %w", err)
 	}
 
-	writer := kafka.StartProducer(ctx, l)
+	producer := kafka1.StartProducer(ctx, l)
 
 	service := srv.NewServiceImpl(l)
 
-	controller := ctrl.NewController(writer, s3, l, service)
+	controller := ctrl.NewController(producer, s3, l, service)
 
+	// начинает слать сообщения producer
 	go func() {
 		err := controller.DispatchKafka(ctx)
 		if err != nil {
@@ -37,20 +36,23 @@ func Run(ctx context.Context, cfg *config.Config, l *zap.SugaredLogger) error {
 		}
 	}()
 
+	// отправка и сохранение изображений s3
 	go func() {
-		info, err := controller.UploadImage(ctx, "/../../image/", "dto.png")
+		err := controller.UploadImageAndSaveProject(ctx)
 		if err != nil {
 			return
 		}
-		l.Info("s3", info)
 	}()
 
-	server := http.Server{}
+	server := http.Server{
+		Addr:         "app:8888",
+		ReadTimeout:  10,
+		WriteTimeout: 10,
+	}
 
-	list, err := net.Listen("tcp", "app:8080")
+	list, err := net.Listen("tcp", "app:8888")
 	if err != nil {
 		l.Fatal("Ошибка открытия соединения", zap.Error(err))
-		return fmt.Errorf("Ошибка открытия соединения: %w", err)
 	}
 	defer list.Close()
 
@@ -64,15 +66,15 @@ func Run(ctx context.Context, cfg *config.Config, l *zap.SugaredLogger) error {
 	}()
 
 	<-stop
-	kafka.StopProducer(writer)
+
+	if err := kafka1.StopProducer(producer.Writer, l); err != nil {
+		l.Error("error stop kafka1", zap.Error(err))
+	}
 
 	err = server.Shutdown(ctx)
 	if err != nil {
 		l.Error("Сервер некорректно завершил работу", zap.Error(err))
-		return fmt.Errorf("Сервер некорректно завершил работу: %w", err)
 	}
 	close(stop)
 	l.Info("Сервер остановлен Graceful Shutdown")
-
-	return nil
 }

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"KafkaS3/internal/infrastructure/kafka"
+	c "KafkaS3/internal/infrastructure/kafka/consumer"
 	"KafkaS3/internal/infrastructure/logger"
 	"context"
 )
@@ -9,7 +9,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	logger := logger.NewLogger()
+	l := logger.NewLogger()
 
-	kafka.StartConsumer(ctx, logger)
+	c.StartConsumerAndReadMessage(ctx, l)
 }
