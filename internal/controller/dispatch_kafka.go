@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"KafkaS3/internal/dto"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -16,7 +17,20 @@ func (c *Controller) DispatchKafka(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			producerData := c.Service.GenerateFakeData()
+			fakeDataUser := c.Service.GenerateFakeData()
+
+			var producerData []*dto.ProducerData
+			for _, data := range fakeDataUser {
+				producer := dto.ProducerData{
+					Id:        data.Id,
+					FirstName: data.FirstName,
+					LastName:  data.LastName,
+					City:      data.City,
+					Phone:     data.Phone,
+				}
+
+				producerData = append(producerData, &producer)
+			}
 
 			data, err := json.Marshal(producerData)
 			if err != nil {

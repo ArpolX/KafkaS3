@@ -1,7 +1,7 @@
 package service
 
 import (
-	"KafkaS3/internal/dto"
+	"KafkaS3/internal/entity"
 
 	"go.uber.org/zap"
 )
@@ -11,7 +11,7 @@ type ServiceImpl struct {
 }
 
 type Service interface {
-	GenerateFakeData() []*dto.ProducerData
+	GenerateFakeData() []*entity.FakeDataUser
 }
 
 func NewServiceImpl(logger *zap.SugaredLogger) Service {

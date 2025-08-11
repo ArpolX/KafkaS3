@@ -1,15 +1,15 @@
 package service
 
 import (
-	"KafkaS3/internal/dto"
+	"KafkaS3/internal/entity"
 
 	"github.com/brianvoe/gofakeit"
 )
 
-func (s *ServiceImpl) GenerateFakeData() []*dto.ProducerData {
-	producerData := []*dto.ProducerData{}
+func (s *ServiceImpl) GenerateFakeData() []*entity.FakeDataUser {
+	producerData := []*entity.FakeDataUser{}
 	for i := 0; i < 100; i++ {
-		data := dto.ProducerData{
+		data := entity.FakeDataUser{
 			Id:        i,
 			FirstName: gofakeit.FirstName(),
 			LastName:  gofakeit.LastName(),
