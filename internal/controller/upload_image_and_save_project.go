@@ -1,10 +1,10 @@
 package controller
 
 import (
+	"compress/gzip"
 	"context"
 	"fmt"
-	"log"
-	"net/http"
+	"io"
 	"os"
 
 	"github.com/minio/minio-go/v7"
@@ -25,26 +25,38 @@ func (c *Controller) UploadImageAndSaveProject(ctx context.Context) error {
 
 	for _, file := range files {
 		filePath := fmt.Sprintf("%v/%v", imageDirPath, file.Name())
+		fileName := file.Name() + ".gz"
 
-		contentType, err := detectContentType(filePath)
-		if err != nil {
-			c.Logger.Error("Ошибка в определении типа файла", zap.Error(err))
-			return fmt.Errorf("Ошибка в определении типа файла: %w", err)
-		}
+		pr, pw := io.Pipe()
+
+		go func() {
+			defer pw.Close()
+
+			file, err := os.Open(filePath)
+			if err != nil {
+				c.Logger.Error("Ошибка открытия файла, метод UploadImageAndSaveProject", zap.Error(err))
+				return
+			}
+			defer file.Close()
+
+			zip := gzip.NewWriter(pw)
+			defer zip.Close()
+
+			_, err = io.Copy(zip, file)
+			if err != nil {
+				c.Logger.Error("Ошибка при копировании, метод UploadImageAndSaveProject", zap.Error(err))
+				return
+			}
+		}()
 
 		// сохранили
-		info, err := c.S3.Minio.FPutObject(ctx, c.S3.Bucket, file.Name(), filePath, minio.PutObjectOptions{
-			ContentType: contentType,
-		})
-		if err != nil {
-			c.Logger.Error("Ошибка отправки изображения в s3, метод UploadImage", zap.Error(err))
-			return fmt.Errorf("Ошибка отправки изображения в s3, метод UploadImage: %w", err)
+		if err := saveImageInS3(ctx, c.S3.Minio, c.Logger, c.S3.Bucket, fileName, pr); err != nil {
+			return fmt.Errorf("Ошибка при сохранении изображения в S3: %w", err)
 		}
-		c.Logger.Info("Изображение отправлено, информация:", info)
 
 		// взяли
-		if err := getImageAndSaveInProject(ctx, c.S3.Minio, c.Logger, c.S3.Bucket, file.Name()); err != nil {
-			return fmt.Errorf("Ошибка в загрузке изображения: %w", err)
+		if err := saveImageInProject(ctx, c.S3.Minio, c.Logger, c.S3.Bucket, fileName); err != nil {
+			return fmt.Errorf("Ошибка при загрузки изображения из S3: %w", err)
 		}
 		c.Logger.Info("Изображение загружено в папку download_s3_image")
 	}
@@ -52,30 +64,47 @@ func (c *Controller) UploadImageAndSaveProject(ctx context.Context) error {
 	return nil
 }
 
-func getImageAndSaveInProject(ctx context.Context, client *minio.Client, l *zap.SugaredLogger, bucket, fileName string) error {
+func saveImageInProject(ctx context.Context, client *minio.Client, l *zap.SugaredLogger, bucket, fileName string) error {
 	savePathImage := fmt.Sprintf("%v/%v", savePath, fileName)
-	err := client.FGetObject(ctx, bucket, fileName, savePathImage, minio.GetObjectOptions{})
+	image, err := client.GetObject(ctx, bucket, fileName, minio.GetObjectOptions{})
 	if err != nil {
 		l.Error("Не удалось загрузить изображение, метод GetImageAndSaveInProject", zap.Error(err))
 		return fmt.Errorf("Не удалось загрузить изображение, метод GetImageAndSaveInProject: %w", err)
+	}
+	defer image.Close()
+
+	zip, err := gzip.NewReader(image)
+	if err != nil {
+		l.Error("Ошибка декомпрессии", zap.Error(err))
+		return fmt.Errorf("Ошибка декомпрессии: %w", err)
+	}
+	defer zip.Close()
+
+	f, err := os.Create(savePathImage)
+	if err != nil {
+		l.Error("Ошибка открытия файла сохранения", zap.Error(err))
+		return fmt.Errorf("Ошибка открытия файла сохранения: %w", err)
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, zip)
+	if err != nil {
+		l.Error("Ошибка при копировании, метод UploadImageAndSaveProject", zap.Error(err))
+		return fmt.Errorf("Ошибка при копировании, метод UploadImageAndSaveProject: %w", err)
 	}
 
 	return nil
 }
 
-func detectContentType(filePath string) (string, error) {
-	log.Println(filePath)
-	file, err := os.Open(filePath)
+func saveImageInS3(ctx context.Context, client *minio.Client, l *zap.SugaredLogger, bucket, fileName string, file io.Reader) error {
+	info, err := client.PutObject(ctx, bucket, fileName, file, -1, minio.PutObjectOptions{
+		ContentType:     "image/gzip",
+		ContentEncoding: "gzip",
+	})
 	if err != nil {
-		return "", fmt.Errorf("Ошибка открытия файла, метод detectContentType: %w", err)
+		l.Error("Ошибка отправки изображения в s3, метод UploadImage", zap.Error(err))
+		return fmt.Errorf("Ошибка отправки изображения в s3, метод UploadImage: %w", err)
 	}
-	defer file.Close()
-
-	buf := make([]byte, 512)
-	n, err := file.Read(buf)
-	if err != nil {
-		return "", fmt.Errorf("Ошибка чтения файла, метод detectContentType: %w", err)
-	}
-
-	return http.DetectContentType(buf[:n]), nil
+	l.Info("Изображение отправлено, информация:", info)
+	return nil
 }
